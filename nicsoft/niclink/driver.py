@@ -14,7 +14,6 @@
 #  NicLink. if not, see <https://www.gnu.org/licenses/>.
 
 import logging
-
 # system
 import sys
 import threading
@@ -26,7 +25,6 @@ import numpy as np
 import numpy.typing as npt
 
 from . import _niclink
-
 # mine
 from .nl_exceptions import ExitNicLink, IllegalMove, NoMove, NoNicLinkFen
 
@@ -100,7 +98,6 @@ class NicLinkManager(threading.Thread):
         self.nl_interface = _niclink
 
         self.refresh_delay = refresh_delay
-
 
         try:
             self.connect()
