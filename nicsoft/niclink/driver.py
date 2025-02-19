@@ -24,6 +24,7 @@ import chess
 import numpy as np
 import numpy.typing as npt
 
+# EaskLink pybind interface
 from . import _niclink
 # mine
 from .nl_exceptions import ExitNicLink, IllegalMove, NoMove, NoNicLinkFen
@@ -177,9 +178,6 @@ and turned on?"
         """connect to the chessboard
         @param: bluetooth - should we use bluetooth
         """
-
-        if bluetooth:
-            raise NotImplementedError
 
         # connect to the chessboard, this must be done first
         self.nl_interface.connect()
@@ -417,6 +415,7 @@ called with following light_board:"
 
     def get_fen(self) -> str:
         """get the board fen from chessboard"""
+
         fen = self.nl_interface.get_fen()
         if fen is not None:
             return fen

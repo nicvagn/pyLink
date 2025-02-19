@@ -1,12 +1,57 @@
 import asyncio
 
-from bleak import BleakClient
-from niclink.bluetooth import (INITIALIZASION_CODE, MASKLOW, READCONFIRMATION,
-                               READDATA, WRITECHARACTERISTICS, convertDict)
+from bleak import BleakClient, BleakScanner
+from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
+from niclink.bluetooth import (DEVICELIST, INITIALIZASION_CODE, MASKLOW,
+                               READCONFIRMATION, READDATA,
+                               WRITECHARACTERISTICS, convertDict)
+
+"""Discover chessnut Air devices.
+See pdf file Chessnut_comunications.pdf
+for more information."""
+
+
+class GetChessnutAirDevices:
+    """Class created to discover chessnut Air devices.
+    It returns the first device with a name that maches
+    the names in DEVICELIST.
+    """
+
+    def __init__(self, timeout=10.0):
+        self.deviceNameList = DEVICELIST  # valid device name list
+        self.device = self.advertisement_data = None
+
+    def filter_by_name(
+        self,
+        device: BLEDevice,
+        advertisement_data: AdvertisementData,
+    ) -> None:
+        """Callback for each discovered device.
+        return True if the device name is in the list of
+        valid device names otherwise it returns False"""
+        if any(ext in device.name for ext in self.deviceNameList):
+            self.device = device
+            return True
+        else:
+            return False
+
+    async def discover(self, timeout=10.0):
+        """Scan for chessnut Air devices"""
+        print("scanning, please wait...")
+        await BleakScanner.find_device_by_filter(
+            self.filter_by_name)
+        if self.device is None:
+            print("No chessnut Air devices found")
+            return
+        print("done scanning")
+
 
 # Globals used for convieniance
 oldData = None
 CLIENT = None
+curFEN = None
+fen_change_event = asyncio.Event()
 
 
 def fen_constructor(preceding_empty, piece_code) -> str:
@@ -41,6 +86,7 @@ def board_fen(data):  # -> the board fen as a string
     black knight (0x5) on G8 and the second byte's value of 0x23 means a
     black bishop (0x3) on F8 and a black king (0x2) on E8.
     """
+    global curFEN
     print(f"boardFEN({data.hex()})")
     """
     convertDict = {0: " ",
@@ -99,6 +145,8 @@ def board_fen(data):  # -> the board fen as a string
             FEN += "/"
 
     print(f"FEN: {FEN} from {data.hex()}")
+    # new val for the global fen var
+    curFEN = FEN
     return FEN
 
 
@@ -187,12 +235,11 @@ async def run(connect, debug=False):
 
     async def notification_handler(characteristic, data):
         """Handle the notification from the device and print the board."""
-        global oldData
+        global oldData, curFEN
         # print("data: ", ''.join('{:02x}'.format(x) for x in data))
         if data[2:34] != oldData:
             printBoard(data[2:34])
-
-            bFEN = boardFEN(data[2:34])
+            curFEN = board_fen(data[2:34])
             print(f"board FEN: {bFEN}")
             await leds(data[2:34])
             oldData = data[2:34].copy()
@@ -206,14 +253,31 @@ async def run(connect, debug=False):
         await client.start_notify(READDATA, notification_handler)
         # send initialisation string
         await client.write_gatt_char(WRITECHARACTERISTICS, INITIALIZASION_CODE)
-        await asyncio.sleep(100.0)  # wait 100 seconds
-        await client.stop_notify(READDATA)  # stop the notification handler
 
 
-board_fen(b'X#1\x85DDDD\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00wwww\xa6\xc9\x9bj')
+def connect():
+    """Connect with chessnut air over bluetooth"""
+    print("connecting over bluetooth")
+    connect = GetChessnutAirDevices()
+    # get device
+    asyncio.run(connect.discover())
+    # connect to device
+    asyncio.run(run(connect))
 
-# connect = GetChessnutAirDevices()
-# # get device
-# asyncio.run(connect.discover())
-# # connect to device
-# asyncio.run(run(connect))
+
+def disconnect():
+    """disconnect from the board"""
+    global CLIENT
+    CLIENT.stop_notify(READDATA)  # stop the notification handler
+
+async def waiter(event):
+    print('waiting for it ...')
+    await event.wait()
+    print('... got it!')
+
+
+if __name__ == "__main__":
+    connect()
+    while True:
+        print(curFEN)
+        asyncio.sleep(10)
