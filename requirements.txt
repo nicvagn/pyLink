@@ -8,3 +8,7 @@ readchar==4.0.5
 pyserial==3.5
 wheel==0.42.0
 stockfish==3.28.0
+async-timeout==4.0.2
+asyncio==3.4.3
+bleak
+dbus-fast==1.83.1
